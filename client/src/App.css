@@ -1,0 +1,35 @@
+.App {
+  /* align-items: center;
+  justify-content: center; */
+}
+
+body {
+  /* display: flex; */
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.msgbox-container {
+  /* position: fixed;
+  margin-top: 50em;
+  display: flex;
+  align-items: center;
+  justify-content: center; */
+}
+
+.msgs-container {
+  left: 0; 
+  right: 0; 
+  margin-left: auto; 
+  margin-right: auto; 
+  width: 20em;
+  z-index: 1;
+  position: absolute;
+  max-height: 25em;
+  overflow-y: scroll;
+}
+
