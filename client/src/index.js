@@ -18,10 +18,6 @@ export const router = createBrowserRouter([
     path: '/chat/:roomId',
     element: <Game socket={socket} />,
   },
-  {
-    path: '/dootz',
-    element: <div>dootz</div>
-  },
   
 ])
 
