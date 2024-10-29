@@ -28,7 +28,7 @@ export default function Game({ socket }) {
             await socket.emit("join_room", { roomId, username: state.username })
             window.history.replaceState({}, '', window.location.pathname);
 
-            const roomData = (await axios.get(`http://localhost:6969/${roomId}`)).data;
+            const roomData = (await axios.get(`skribblio-clone-production.up.railway.app/${roomId}`)).data;
             setMessages(roomData.messages);
             setUsers(roomData.users);
             setCanvasHistory(roomData.canvasActionsHistory);
