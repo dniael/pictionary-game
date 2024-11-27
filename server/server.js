@@ -1,6 +1,9 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+
+import words from './words.json' assert {type: 'json'};
+
 const app = express()
 import { Server } from 'socket.io';
 app.use(cors())
@@ -20,6 +23,8 @@ const STATES = Object.freeze({
     GAME_FINISHED: "FINISHED"
 });
 
+const DEFAULT_WORD_CHOICE_AMOUNT = 3;
+
 const getRoom = id => rooms.find(room => room.id === id)
 const removeUserFromRoom = (room, socketId) => room.users = room.users.filter(user => user.id !== socketId)
 
@@ -30,14 +35,16 @@ io.on('connection', socket => {
         rooms.push({
             id: data.roomId,
             users: [],
-            leader: null,
+            leaderId: data.creator,
             currentDrawer: null,
             messages: [],
             state: STATES.GAME_LOBBY,
             canvasActionsHistory: [],
             canvasUndoHistory: [],
             drawtime: data.drawtime,
-            rounds: data.rounds
+            rounds: data.rounds,
+            wordDifficulty: data.difficulty,
+            currentWord: null
         })
     })
     
@@ -45,10 +52,6 @@ io.on('connection', socket => {
         const room = getRoom(data.roomId)
         if (!room) return;
         const userData = { username: data.username, id: socket.id, points: 0 }
-
-        if (room.users.length === 0) {
-            room.leader = userData;
-        }
         
         room.users.push(userData)
         room.messages.push({ type: "System", message: `${data.username} joined.` })
@@ -56,13 +59,28 @@ io.on('connection', socket => {
         socket.join(data.roomId)
         console.log(`User with ID: ${socket.id} joined room: ${data.roomId}`)
         socket.to(data.roomId).emit("user_connect", userData)
+        console.log(room);
     })
 
-    socket.on("game_start", data => {
+    socket.on("initialize", data => {
         const room = getRoom(data.roomId);
         room.state = STATES.GAME_ONGOING;
         room.currentDrawer = room.users[0];
-        socket.to(data.roomId).emit("game_started");
+        room.users.forEach(user => user.points = 0);
+        room.currentWord = data.word;
+        console.log("game initialized");
+        socket.to(data.roomId).emit("receive_initialize", room);
+    })
+
+    socket.on("new_drawer", data => {
+        const room = getRoom(data.roomId);
+        if (data.newRound) {
+            room.currentDrawer = room.users[0];
+        } else {
+            room.currentDrawer = room.users[room.users.findIndex(user => user.id == room.currentDrawer.id) + 1];
+        }
+        room.currentWord = data.word;
+        socket.to(data.roomId).emit("receive_new_drawer", { ...room, newRound });
     })
  
     socket.on("send_message", data => {
@@ -73,6 +91,7 @@ io.on('connection', socket => {
     })
 
     socket.on("send_draw_start", data => {
+        console.log("draw start");
         const room = getRoom(data.roomId);
         const { colour, width, x, y } = data;
         room.canvasActionsHistory.push({ colour, width, points: [{ x, y }] });
@@ -112,44 +131,47 @@ io.on('connection', socket => {
         const user = room.users.find(u => u.id === socket.id)
         if (!user) return;
 
-        console.log("from leave room event")
-                
-        socket.to(room.id).emit("user_disconnect", user)
-        room.messages.push({ type: "System", message: `${user.username} left.` })
-        
-        removeUserFromRoom(room, socket.id)
+        console.log("from leave room event")    
+        userLeave(socket, user, room);
         socket.leave(room.id)
-
-        switch (room.users.length) {
-            case 0:
-                rooms.splice(rooms.indexOf(room), 1)
-                console.log(`Closed room ${room.id}`)
-            
-            case 1:
-                room.leader = room.users[0]
-        }
         
     })
 
     socket.on('disconnect', () => {
-        
-        rooms.forEach((room, index) => {
+        rooms.forEach((room, _) => {
             const user = room.users.find(u => u.id === socket.id)
             if (user) {
                 console.log("disconnect event")
                 console.log(user)
-                socket.to(room.id).emit("user_disconnect", user)
-                room.messages.push({ type: "System", message: `${user.username} left.` })
-                removeUserFromRoom(room, socket.id)
-                if (room.users.length === 0) {
-                    rooms.splice(index, 1)
-                    console.log(`Closed room ${room.id}`)
-                }   
+                userLeave(socket, user, room); 
             }
         })
         console.log(`user disconnected! ${socket.id}`)
     })
 })
+
+function userLeave(socket, user, room) {
+
+    room.messages.push({ type: "System", message: `${user.username} left.` })
+    
+    removeUserFromRoom(room, socket.id)
+    let newLeader = false; 
+
+    if (room.users.length == 0) {
+        rooms.splice(rooms.indexOf(room), 1);
+        console.log(`Closed room ${room.id}`);
+    } else {
+        console.log(room.leaderId);
+        newLeader = room.leaderId != room.users[0].id;
+        if (newLeader) {
+            room.leaderId = room.users[0].id;
+        }
+    }
+
+    socket.to(room.id).emit("user_disconnect", { user, leaderId: newLeader ? room.leaderId : null })
+
+    console.log(room)
+}
 
 app.get('/:roomId/exists', (req, res) => {
     res.send(getRoom(req.params.roomId) !== undefined)
@@ -179,4 +201,16 @@ app.get('/:roomId/state', (req, res) => {
     res.send(getRoom(req.params.roomId).state);
 })
 
-server.listen(6969, () => console.log(`Server running on http://localhost:6969`))
+function getRandomArrayElements(arr, amount) {
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, amount);
+}
+
+app.get('/:roomId/words', (req, res) => {
+    const room = getRoom(req.params.roomId);
+    const difficulty = room.wordDifficulty;
+
+    res.send(getRandomArrayElements(words[difficulty], DEFAULT_WORD_CHOICE_AMOUNT));
+})
+
+server.listen(3001, () => console.log(`Server running on http://localhost:3001`))
