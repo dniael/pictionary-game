@@ -23,8 +23,8 @@ This project is an in progress pictionary game inspired by the popular online mu
 ### Steps
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/skribblo-clone.git
-    cd skribblo-clone
+    git clone https://github.com/yourusername/pictionary-game.git
+    cd pictionary-game
     ```
 
 2. **Install dependencies**:
