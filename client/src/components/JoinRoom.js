@@ -39,9 +39,8 @@ export default function JoinRoom({ socket }) {
         const roomId = roomIdInputRef.current.value
     
         if ((username === "") || (existing && roomId === "")) return;
-        console.log("test")
-        if (existing) {
 
+        if (existing) {
             const room = await roomExists(roomId);
             if (!room) {
                 setErr(true);
@@ -54,11 +53,15 @@ export default function JoinRoom({ socket }) {
             return;
 
         } 
-        const drawtime = drawtimeRef.current.value
-        const rounds = roundsRef.current.value
+
+        const drawtime = drawtimeRef.current.value;
+        const rounds = roundsRef.current.value;
+        const difficulty = difficultyRef.current.value;
         const newRoomId = generateRoomId();
         handleCloseModal();
-        await socket.emit("create_room", { roomId: newRoomId, drawtime, rounds })
+        
+        // have to pass in id instead of the entire socket object, otherwise results in infinite recursion
+        await socket.emit("create_room", { roomId: newRoomId, drawtime, rounds, difficulty, creator: socket.id }) 
         navigate(`/chat/${newRoomId}`, { state: { username } })
     }
 

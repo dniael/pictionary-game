@@ -213,4 +213,4 @@ app.get('/:roomId/words', (req, res) => {
     res.send(getRandomArrayElements(words[difficulty], DEFAULT_WORD_CHOICE_AMOUNT));
 })
 
-server.listen(3001, () => console.log(`Server running on http://localhost:3001`))
+server.listen(6969, () => console.log(`Server running on http://localhost:6969`))

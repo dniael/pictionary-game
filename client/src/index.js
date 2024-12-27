@@ -8,7 +8,7 @@ import {
 import io from 'socket.io-client'
 import Game from './components/Game';
 
-const socket = io.connect('skribblio-clone-production.up.railway.app');
+const socket = io.connect('localhost:6969');
 export const router = createBrowserRouter([
   {
     path: '/',
