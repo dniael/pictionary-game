@@ -36,13 +36,16 @@ io.on('connection', socket => {
             id: data.roomId,
             users: [],
             leaderId: data.creator,
-            currentDrawer: null,
+            currentDrawer: {
+                id: data.creator,
+            },
             messages: [],
             state: STATES.GAME_LOBBY,
             canvasActionsHistory: [],
             canvasUndoHistory: [],
             drawtime: data.drawtime,
             rounds: data.rounds,
+            currentRound: 1,
             wordDifficulty: data.difficulty,
             currentWord: null
         })
@@ -62,6 +65,13 @@ io.on('connection', socket => {
         console.log(room);
     })
 
+    socket.on("clear_board", data => {
+        const room = getRoom(data.roomId);
+        room.canvasActionsHistory = [];
+        room.canvasUndoHistory = [];
+        socket.to(data.roomId).emit("receive_clear_board");
+    });
+
     socket.on("initialize", data => {
         const room = getRoom(data.roomId);
         room.state = STATES.GAME_ONGOING;
@@ -70,17 +80,20 @@ io.on('connection', socket => {
         room.currentWord = data.word;
         console.log("game initialized");
         socket.to(data.roomId).emit("receive_initialize", room);
+        startDrawtimeCountdown(socket, room);
     })
 
     socket.on("new_drawer", data => {
         const room = getRoom(data.roomId);
         if (data.newRound) {
             room.currentDrawer = room.users[0];
+            room.currentRound++;
         } else {
             room.currentDrawer = room.users[room.users.findIndex(user => user.id == room.currentDrawer.id) + 1];
         }
         room.currentWord = data.word;
-        socket.to(data.roomId).emit("receive_new_drawer", { ...room, newRound });
+        socket.to(data.roomId).emit("receive_new_drawer", { ...room, newRound: data.newRound });
+        startDrawtimeCountdown(socket, room);
     })
  
     socket.on("send_message", data => {
@@ -149,6 +162,17 @@ io.on('connection', socket => {
         console.log(`user disconnected! ${socket.id}`)
     })
 })
+
+function startDrawtimeCountdown(socket, room) {
+    let timeLeft = room.drawtime;
+    const interval = setInterval(() => {
+        timeLeft--;
+        socket.to(room.id).emit("countdown_tick", { timeLeft });
+        if (timeLeft === 0) {
+            clearInterval(interval);
+        }
+    }, 1000);  
+}
 
 function userLeave(socket, user, room) {
 

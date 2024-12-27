@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import Card from 'react-bootstrap/Card';
 import { jumpToPoint, draw, drawLine, drawAllLines } from '../utils/draw.js';
 
-export default function Canvas({ socket, roomId, initHistory, initUndoHistory }) {
+export default function Canvas({ socket, roomId, initHistory, initUndoHistory, viewOnly }) {
 
     const canvasRef = React.createRef();
     const colourRef = React.createRef();
@@ -39,11 +39,18 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory })
             drawLine(ctx, data.line);
         }
 
+        const clearBoard = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            setHistory([]);
+            setUndoHistory([]);
+        }
+
         socket.on("receive_draw_start", drawStartHandler);
         socket.on("receive_drawing", drawingHandler);
         socket.on("receive_draw_end", drawEndHandler);
         socket.on("receive_undo", undoHandler);
         socket.on("receive_redo", redoHandler);
+        socket.on("clear_board", clearBoard);
 
         drawAllLines(ctx, initHistory);
 
@@ -53,6 +60,7 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory })
             socket.off("receive_draw_end", drawEndHandler);
             socket.off("receive_undo", undoHandler);
             socket.off("receive_redo", redoHandler);
+            socket.off("clear_board", clearBoard);
         }
     }, [initHistory, initUndoHistory]);
 
@@ -134,19 +142,21 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory })
         drawLine(ctx, line);
     }
 
+    const visibility = viewOnly ? 'hidden' : 'visible';
+
     return (
         <>
             <canvas
                 ref={canvasRef} 
                 width="700" 
                 height="600" 
-                onMouseDown={e => drawStart(e)}
-                onMouseMove={e => drawing(e)}
-                onMouseUp={() => drawEnd()}
-                onMouseOut={() => drawEnd()}
+                onMouseDown={viewOnly ? null : e => drawStart(e)}
+                onMouseMove={viewOnly ? null :e => drawing(e)}
+                onMouseUp={viewOnly ? null : () => drawEnd()}
+                onMouseOut={viewOnly ? null : () => drawEnd()}
             ></canvas>
                
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '30px', maxWidth: '70%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '30px', maxWidth: '70%', gap: '10px', visibility: visibility }}>
                 <button onClick={undo}>UNDO</button>
                 <button onClick={redo}>REDO</button>
                 <label for='color'>Select Colour</label>

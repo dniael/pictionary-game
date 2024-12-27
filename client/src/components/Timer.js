@@ -10,27 +10,33 @@ export default function Timer({ visible, socket, onEnd, word }) {
     const letterRevealInterval = useRef(0);
     const revealedLetters = useRef(word.split("").map(char => char == " " ? char : "___"));
     const revealedLetterIndexes = useRef([]);
+    const originalTime = useRef();
 
     useEffect(() => {
+
+        c
+
         setRemainingLetters(revealedLetters.current.join(" "));
 
         const gameStartListener = data => {
             setTimeLeft(data.drawtime);
-            
+            console.log(word);
+            originalTime.current = data.drawtime;
             letterRevealInterval.current = Math.ceil((data.drawtime - TIME_OFFSET) / (word.length));
         }
 
-        socket.on("game_start", gameStartListener);
+        socket.on("receive_initialize", gameStartListener);
 
         const timeTickListener = data => {
             setTimeLeft(data.timeLeft);
             if (data.timeLeft === 0) {
                 onEnd();
+                setTimeLeft(originalTime.current);
             } else if (
-                (data.timeLeft % letterRevealInterval === 0) && 
+                (data.timeLeft % letterRevealInterval.current === 0) && 
                 (remainingLetters.filter(l => l === "___").length > LETTER_OFFSET)
             ) {
-                const rand = Math.floor(Math.random()*word.length);
+                const rand = Math.floor(Math.random() * word.length);
 
                 const alreadyRevealed = revealedLetterIndexes.current.includes(rand);
                 const blankSpace = revealedLetters.current[rand] === " " || word[rand] === " "
@@ -44,11 +50,12 @@ export default function Timer({ visible, socket, onEnd, word }) {
             }
         }
 
-        socket.on("game_tick", timeTickListener);
+
+        socket.on("countdown_tick", timeTickListener);
 
         return () => {
-            socket.off("game_start", gameStartListener);
-            socket.off("game_tick", timeTickListener);
+            socket.off("receive_initialize", gameStartListener);
+            socket.off("countdown_tick", timeTickListener);
         }
     })
 

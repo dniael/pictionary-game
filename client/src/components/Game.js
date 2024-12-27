@@ -45,12 +45,15 @@ export default function Game({ socket }) {
 
             console.log(roomId.current);
             const roomData = (await axios.get(`http://localhost:6969/${roomId.current}`)).data;
+
             setMessages(roomData.messages);
             setUsers(roomData.users);
             setCanvasHistory(roomData.canvasActionsHistory);
             setCanvasUndoHistory(roomData.canvasUndoHistory);
             setLeader(roomData.leaderId);
-            setGameStarted(roomData.state == STATES.GAME_ONGOING);         
+            setGameStarted(roomData.state == STATES.GAME_ONGOING);    
+            setCurrentRound(roomData.currentRound);     
+
             totalRounds.current = roomData.rounds;
 
             if (roomData.currentDrawer) {
@@ -66,19 +69,22 @@ export default function Game({ socket }) {
             setMessages(msgs => [...msgs, { type: "System", message: `${data.username} joined.` }]);
             setUsers(users => [...users, data]);
         }
+
         const disconnectListener = data => {
             setMessages(msgs => [...msgs, { type: "system", message: `${data.user.username} left.` }]);
-
+            setLeader(data.leaderId);
             setUsers(prevUsers => {
                 const newUsers = prevUsers.filter(user => user.id !== data.user.id);
                 
-                // Check that newUsers is non-empty before setting a new drawer
-                const newDrawer = newUsers[newUsers.findIndex(user => user.id === data.user.id) + 1];
-                setCurrentDrawer(newDrawer);
-                
-                // Check if the new drawer is the current socket user
-                getWordChoices();
-                setShowModal(newDrawer && newDrawer.id === socket.id);
+                if (gameStarted && !newUsers.some(user => user.id === currentDrawer.id)) {
+                    // Check that newUsers is non-empty before setting a new drawer
+                    const newDrawer = newUsers[newUsers.findIndex(user => user.id === data.user.id) + 1];
+                    setCurrentDrawer(newDrawer);
+                    
+                    // Check if the new drawer is the current socket user
+                    getWordChoices();
+                    setShowModal(newDrawer && newDrawer.id === socket.id);
+                }
     
                 return newUsers;
             });
@@ -114,7 +120,7 @@ export default function Game({ socket }) {
                 socket.emit("leave_room", { roomId: roomId.current });
             });
         }
-    }, [])
+    }, [gameStarted, users])
 
     if (!state.current) {
         socket.emit("leave_room", { roomId: roomId.current });
@@ -127,27 +133,27 @@ export default function Game({ socket }) {
     }
 
     // KEEP FIGURING OUT ROUNDS SYSTEM
-    const handleNewDrawer = (word, round) => {
-        
-        // accessing snapshots of state variables
-        const currentDrawerCopy = currentDrawer;
-        const currentRoundCopy = currentRound;
+    const handleNewDrawer = (word, round, currentDrawer) => {
 
+        console.log("new drawer ", round);
+        socket.emit("clear_board", { roomId: roomId.current });
         // handle game start
-        if (currentRoundCopy === 1) {
+        if (round === 1) {
+            console.log("game start");
             setGameStarted(true);
-            socket.emit("initialize", { roomId: roomId.current, word });
             setCurrentDrawer(users[0]);
             setCurrentWord(word);
             setShowModal(false);
+
+            socket.emit("initialize", { roomId: roomId.current, word });
             return;
         }
 
         // if reached last user
-        const newRound = currentDrawerCopy.id == users[users.length - 1].id;
+        const newRound = currentDrawer.id == users[users.length - 1].id;
 
         if (newRound) {
-            if (round == totalRounds.current) {
+            if (round > totalRounds.current) {
                 alert("game end"); // TODO
                 return;
             }
@@ -170,6 +176,12 @@ export default function Game({ socket }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column'}}>
+        <Timer 
+            visible={gameStarted} 
+            socket={socket} 
+            onEnd={() => handleNewDrawer(currentWord, currentRound, currentDrawer)}
+            word={currentWord ? currentWord : ""}    
+        />
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: '0px 50px 50px 50px', maxWidth: '100%' }}>
             <Card style={{ minWidth: '20em', verticalAlign: 'middle', top: '50px', position: 'relative', minHeight:'700px', maxHeight: '700px' }}>
                 <Card.Header>
@@ -240,11 +252,12 @@ export default function Game({ socket }) {
             <Modal.Body>
                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly' }}>
                     {wordChoices.map(word => (
-                        <Button variant='primary' onClick={() => handleNewDrawer(word)}>
+                        <Button variant='primary' onClick={() => handleNewDrawer(word, currentRound, currentDrawer)}>
                             {word}
                         </Button>
                     ))}
-                </div>                                       
+
+                </div>                                      
             </Modal.Body>
         </Modal>
         </div>
