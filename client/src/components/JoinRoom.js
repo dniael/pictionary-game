@@ -16,6 +16,7 @@ export default function JoinRoom({ socket }) {
     const usernameInputRef = React.createRef();
     const roomIdInputRef = React.createRef();
     const playersRef = React.createRef();
+    const difficultyRef = React.createRef();
     const drawtimeRef = React.createRef();
     const roundsRef = React.createRef();
 
@@ -114,7 +115,13 @@ export default function JoinRoom({ socket }) {
                         <select name='rounds' ref={roundsRef}>
                             {Array.from({ length: 8 }).map((_, round) => <option>{round + 3}</option>)}
                         </select>
-                    </div>                                        
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <label for='difficulty'>Difficulty</label>
+                        <select name='difficulty' ref={difficultyRef}>
+                            {["Easy", "Medium", "Hard", "Very Hard"].map(difficulty => <option>{difficulty}</option>)}
+                        </select>
+                    </div>                                         
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant='secondary' onClick={handleCloseModal}>Close</Button>
