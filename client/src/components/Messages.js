@@ -49,8 +49,7 @@ export default function Messages({ socket, roomId, username, messages, onMsg }) 
                         )
                         }
                     </div>
-                    )
-                )}
+                ))}
             </Card.Body>
             <Card.Footer>
                 <Form.Control ref={msgInputRef} className='mb-3' type='text' placeholder='Enter Message' onKeyDown={e => sendMessage(e)}  />

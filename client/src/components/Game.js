@@ -53,6 +53,7 @@ export default function Game({ socket }) {
             setLeader(roomData.leaderId);
             setGameStarted(roomData.state == STATES.GAME_ONGOING);    
             setCurrentRound(roomData.currentRound);     
+            setCurrentWord(roomData.currentWord);
 
             totalRounds.current = roomData.rounds;
 
@@ -130,6 +131,17 @@ export default function Game({ socket }) {
 
     const getWordChoices = () => {
         axios.get(`http://localhost:6969/${roomId.current}/words`).then(res => setWordChoices(res.data));
+    }
+
+    const startGame = () => {
+
+        if (users.length === 1) {
+            alert("need more players");
+            return;
+        }
+
+        getWordChoices();
+        setShowModal(true);
     }
 
     // KEEP FIGURING OUT ROUNDS SYSTEM
@@ -221,15 +233,11 @@ export default function Game({ socket }) {
                         initUndoHistory={canvasUndoHistory}
                         viewOnly={socket.id != currentDrawer.id}
                     />
-                )
-                : (
+                ) : (
                     <Button 
                         style={{ visibility: (leader == socket.id ? 'visible' : 'hidden') }} 
                         variant='primary' 
-                        onClick={() => {
-                            getWordChoices();
-                            setShowModal(true);
-                        }}
+                        onClick={() => startGame()}
                     >
                         START
                     </Button>

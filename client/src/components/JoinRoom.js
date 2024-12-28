@@ -116,7 +116,7 @@ export default function JoinRoom({ socket }) {
                             {Array.from({ length: 8 }).map((_, round) => <option>{round + 3}</option>)}
                         </select>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
                         <label for='difficulty'>Difficulty</label>
                         <select name='difficulty' ref={difficultyRef}>
                             {["Easy", "Medium", "Hard", "Very Hard"].map(difficulty => <option>{difficulty}</option>)}

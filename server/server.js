@@ -79,7 +79,7 @@ io.on('connection', socket => {
         room.users.forEach(user => user.points = 0);
         room.currentWord = data.word;
         console.log("game initialized");
-        socket.to(data.roomId).emit("receive_initialize", room);
+        io.to(data.roomId).emit("game_start", room);
         startDrawtimeCountdown(socket, room);
     })
 
@@ -164,10 +164,11 @@ io.on('connection', socket => {
 })
 
 function startDrawtimeCountdown(socket, room) {
+    console.log("starting countdown");
     let timeLeft = room.drawtime;
     const interval = setInterval(() => {
         timeLeft--;
-        socket.to(room.id).emit("countdown_tick", { timeLeft });
+        io.to(room.id).emit("countdown_tick", { timeLeft });
         if (timeLeft === 0) {
             clearInterval(interval);
         }
