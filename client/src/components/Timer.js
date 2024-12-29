@@ -3,7 +3,7 @@ import Card from 'react-bootstrap/Card';
 
 const TIME_OFFSET = 5, LETTER_OFFSET = 2;
 
-export default function Timer({ visible, socket, onEnd, word }) {
+export default function Timer({ visible, socket, onEnd, word, currentDrawer }) {
 
     const [timeLeft, setTimeLeft] = useState();
     const [remainingLetters, setRemainingLetters] = useState();
@@ -13,9 +13,10 @@ export default function Timer({ visible, socket, onEnd, word }) {
     const originalTime = useRef();
 
     useEffect(() => {
-        setRevealedLetters(word.split("").map(char => char == " " ? char : "___"));
-
-    }, [word, ])
+        if (word) {
+            setRevealedLetters(word.split("").map(char => char == " " ? char : "___"));
+        }
+    }, [word])
 
     useEffect(() => {
 
@@ -33,7 +34,7 @@ export default function Timer({ visible, socket, onEnd, word }) {
             console.log("d ",letterRevealInterval.current);
         }
 
-        socket.on("game_start", gameStartListener);
+        socket.on("receive_start_draw", gameStartListener);
 
         const timeTickListener = data => {
             setTimeLeft(data.timeLeft);
@@ -64,7 +65,7 @@ export default function Timer({ visible, socket, onEnd, word }) {
         socket.on("countdown_tick", timeTickListener);
 
         return () => {
-            socket.off("receive_initialize", gameStartListener);
+            socket.off("game_start", gameStartListener);
             socket.off("countdown_tick", timeTickListener);
         }
     }, [revealedLetters, remainingLetters, word])
@@ -81,7 +82,7 @@ export default function Timer({ visible, socket, onEnd, word }) {
             visibility: visible ? 'visible' : 'hidden'
         }}>
             <Card.Title>{timeLeft} seconds</Card.Title>
-            <Card.Title>{remainingLetters}</Card.Title>
+            <Card.Title>Word: {(currentDrawer && socket.id == currentDrawer.id) ? word : remainingLetters}</Card.Title>
         </div>
     )
 }

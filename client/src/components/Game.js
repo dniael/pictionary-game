@@ -26,7 +26,7 @@ export default function Game({ socket }) {
     const [gameStarted, setGameStarted] = React.useState(false);
     const [currentDrawer, setCurrentDrawer] = React.useState();
     const [currentWord, setCurrentWord] = React.useState();
-    const [currentRound, setCurrentRound] = React.useState(1);
+    const [currentRound, setCurrentRound] = React.useState(0);
 
     const totalRounds = React.useRef();
 
@@ -92,29 +92,42 @@ export default function Game({ socket }) {
 
         }
 
-        const initializeListener = data => {
+        const gameStartedListener = data => {
             setGameStarted(true);
             setCurrentDrawer(data.currentDrawer);
-            setCurrentWord(data.currentWord);
+            console.log("receive start game");
         }
 
         const newDrawerListener = data => {
-            setCurrentWord(data.currentWord);
-            setCurrentDrawer(data.currentDrawer);
-
-            if (data.newRound) {
-                setCurrentRound(round => round + 1);
+            setCurrentDrawer(data.newDrawer);
+            if (data.newDrawer.id == socket.id) {
+                promptWord();
             }
+        }
+
+        const updateRoundListener = data => {
+            setCurrentRound(data.currentRound);
+        }
+
+        const startDrawListener = data => {
+            setCurrentWord(data.word);
+            setShowModal(false);
         }
 
         socket.on("user_connect", connectListener);
         socket.on("user_disconnect", disconnectListener);
-        socket.on("receive_initialize", initializeListener);
+        socket.on("receive_start_game", gameStartedListener);
         socket.on("receive_new_drawer", newDrawerListener);
+        socket.on("receive_update_round", updateRoundListener);
+        socket.on("receive_start_draw", startDrawListener);
 
         return () => {
             socket.off("user_connect", connectListener);
             socket.off("user_disconnect", disconnectListener);
+            socket.off("receive_start_game", gameStartedListener);
+            socket.off("receive_new_drawer", newDrawerListener);
+            socket.off("receive_update_round", updateRoundListener);
+            socket.off("receive_start_draw", startDrawListener);
 
             return router.subscribe(() => {
                 console.log("user leave room via back button press");
@@ -133,57 +146,81 @@ export default function Game({ socket }) {
         axios.get(`http://localhost:6969/${roomId.current}/words`).then(res => setWordChoices(res.data));
     }
 
-    const startGame = () => {
-
+    const startGame = (users) => {
         if (users.length === 1) {
             alert("need more players");
             return;
         }
 
-        getWordChoices();
-        setShowModal(true);
+        console.log("game start");
+        setGameStarted(true);
+        setCurrentDrawer(users[0]);
+
+        socket.emit("start_game", { roomId: roomId.current });
+        socket.emit("update_round", { roomId: roomId.current });
+
+        promptWord();
+    }
+
+    const startDraw = (word, currentDrawer, users) => {
+
+        setCurrentWord(word);
+        socket.emit("clear_board", { roomId: roomId.current });
+        setShowModal(false);
+
+        socket.emit("start_draw", { roomId: roomId.current, word });
+    }
+    
+    const getNewDrawer = (users, currentDrawer) => {
+        console.log(users);
+        const isNewRound = currentDrawer.id === users[users.length - 1].id;
+        let index = 0;
+        if (!isNewRound) {
+            index = users.findIndex(user => user.id === currentDrawer.id) + 1;
+        }
+
+        return [users[index], isNewRound];
     }
 
     // KEEP FIGURING OUT ROUNDS SYSTEM
-    const handleNewDrawer = (word, round, currentDrawer) => {
+    const handleNewDrawer = (round, currentDrawer, users, leader) => {
 
-        console.log("new drawer ", round);
-        socket.emit("clear_board", { roomId: roomId.current });
-        // handle game start
-        if (round === 1) {
-            console.log("game start");
-            setGameStarted(true);
-            setCurrentDrawer(users[0]);
-            setCurrentWord(word);
-            setShowModal(false);
-
-            socket.emit("initialize", { roomId: roomId.current, word });
+        if (users.length === 1) {
+            alert("need more players");
             return;
         }
+        
+        const [newDrawer, isNewRound] = getNewDrawer(users, currentDrawer);
+        setCurrentDrawer(newDrawer);
 
-        // if reached last user
-        const newRound = currentDrawer.id == users[users.length - 1].id;
-
-        if (newRound) {
-            if (round > totalRounds.current) {
+        console.log("new round ", isNewRound);
+        if (isNewRound) {
+            console.log(round, totalRounds.current);
+            if (round == totalRounds.current) {
                 alert("game end"); // TODO
                 return;
             }
             
-            setCurrentDrawer(users[0]);
-            getWordChoices();
-            setShowModal(true);
-            setCurrentRound(round => round + 1);
-        } else {
-            setCurrentDrawer(users[users.findIndex(user => user.id == currentDrawer.id) + 1]);
+            // only emit event once so round doesnt get double incremented
+            if (socket.id === newDrawer.id) {
+                socket.emit("update_round", { roomId: roomId.current });
+            }
+        }   
+
+        // only emit event once 
+        if (socket.id === currentDrawer.id) {
+            socket.emit("new_drawer", { roomId: roomId.current, newDrawer });
         }
 
+        if (newDrawer.id === socket.id) {
+            promptWord();
+        }
+    }
 
-        socket.emit("new_drawer", { roomId: roomId.current, word, round, newRound });
-
-        setCurrentWord(word);
-        setShowModal(false);
-        // reset timer TODO
+    const promptWord = () => {
+        setCurrentWord("");
+        getWordChoices();
+        setShowModal(true);
     }
 
     return (
@@ -191,9 +228,11 @@ export default function Game({ socket }) {
         <Timer 
             visible={gameStarted} 
             socket={socket} 
-            onEnd={() => handleNewDrawer(currentWord, currentRound, currentDrawer)}
-            word={currentWord ? currentWord : ""}    
+            onEnd={() => handleNewDrawer(currentRound, currentDrawer, users, leader)}
+            word={currentWord}
+            currentDrawer={currentDrawer}    
         />
+        {currentRound} / {totalRounds.current}
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: '0px 50px 50px 50px', maxWidth: '100%' }}>
             <Card style={{ minWidth: '20em', verticalAlign: 'middle', top: '50px', position: 'relative', minHeight:'700px', maxHeight: '700px' }}>
                 <Card.Header>
@@ -237,7 +276,7 @@ export default function Game({ socket }) {
                     <Button 
                         style={{ visibility: (leader == socket.id ? 'visible' : 'hidden') }} 
                         variant='primary' 
-                        onClick={() => startGame()}
+                        onClick={() => startGame(users)}
                     >
                         START
                     </Button>
@@ -253,14 +292,14 @@ export default function Game({ socket }) {
             />
         </div>
 
-        <Modal show={showModal} onHide={() => setShowModal(false)}>
-            <Modal.Header closeButton>
+        <Modal show={showModal}>
+            <Modal.Header>
                 <Modal.Title>Choose Word</Modal.Title>
             </Modal.Header>
             <Modal.Body>
                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly' }}>
                     {wordChoices.map(word => (
-                        <Button variant='primary' onClick={() => handleNewDrawer(word, currentRound, currentDrawer)}>
+                        <Button variant='primary' onClick={() => startDraw(word, currentDrawer, users)}>
                             {word}
                         </Button>
                     ))}

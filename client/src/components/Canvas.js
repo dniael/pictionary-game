@@ -18,6 +18,7 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory, v
         const ctx = canvas.getContext('2d');
 
         const drawStartHandler = data => {
+            console.log("draw start received");
             ctx.strokeStyle = data.colour;
             ctx.lineWidth = data.width;
             jumpToPoint(ctx, data);
@@ -40,6 +41,7 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory, v
         }
 
         const clearBoard = () => {
+            console.log("board_clear");
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             setHistory([]);
             setUndoHistory([]);
@@ -50,7 +52,7 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory, v
         socket.on("receive_draw_end", drawEndHandler);
         socket.on("receive_undo", undoHandler);
         socket.on("receive_redo", redoHandler);
-        socket.on("clear_board", clearBoard);
+        socket.on("receive_clear_board", clearBoard);
 
         drawAllLines(ctx, initHistory);
 
@@ -60,7 +62,7 @@ export default function Canvas({ socket, roomId, initHistory, initUndoHistory, v
             socket.off("receive_draw_end", drawEndHandler);
             socket.off("receive_undo", undoHandler);
             socket.off("receive_redo", redoHandler);
-            socket.off("clear_board", clearBoard);
+            socket.off("receove_clear_board", clearBoard);
         }
     }, [initHistory, initUndoHistory]);
 
