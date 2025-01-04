@@ -6,6 +6,7 @@ import words from './words.json' assert {type: 'json'};
 
 const app = express();
 import { Server } from 'socket.io';
+import { clear } from 'console';
 app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -47,7 +48,10 @@ io.on('connection', socket => {
             rounds: data.rounds,
             currentRound: 0,
             wordDifficulty: data.difficulty,
-            currentWord: null
+            currentWord: null,
+
+            // lowkey a hack to prevent a double timer spawn when a user leaves
+            timerId: null,
         });
     });
     
@@ -99,7 +103,7 @@ io.on('connection', socket => {
         const room = getRoom(data.roomId);
         room.currentWord = data.word;
         io.to(data.roomId).emit("receive_start_draw", { word: data.word, drawtime: room.drawtime });
-        startDrawtimeCountdown(socket, room);
+        startDrawtimeCountdown(room);
     });
     
     socket.on("send_message", data => {
@@ -169,22 +173,28 @@ io.on('connection', socket => {
     });
 });
 
-function startDrawtimeCountdown(socket, room) {
+function startDrawtimeCountdown(room) {
     console.log("starting countdown");
     let timeLeft = room.drawtime;
-    const interval = setInterval(() => {
+    const intervalId = setInterval(() => {
         timeLeft--;
         io.to(room.id).emit("countdown_tick", { timeLeft });
         if (timeLeft === 0) {
-            clearInterval(interval);
+            clearInterval(intervalId);
         }
-    }, 1000);  
+    }, 1000);
+
+    // store current timer id to be accessed by the userLeave function
+    room.timerId = intervalId;  
 }
 
 function userLeave(socket, user, room) {
 
     room.messages.push({ type: "System", message: `${user.username} left.` });
     
+    // when a user leaves during drawing, stop the timer
+    clearInterval(room.timerId);
+
     removeUserFromRoom(room, socket.id);
     let newLeader = false; 
 
@@ -209,7 +219,11 @@ app.get('/:roomId/exists', (req, res) => {
 })
 
 app.get('/:roomId', (req, res) => {
-    res.send(getRoom(req.params.roomId));
+    const room = getRoom(req.params.roomId);
+
+    // cant send the timerId to the client; circular structure conversion to JSON
+    const { ['timerId']: _, ...roomData } = room;
+    res.send(roomData);
 })
 
 app.get('/:roomId/messages', (req, res) => {
@@ -217,7 +231,7 @@ app.get('/:roomId/messages', (req, res) => {
 })
 
 app.get('/:roomId/users', (req, res) => {
-    res.send(getRoom(req.params.roomId).users)
+    res.send()
 })
 
 app.get('/:roomId/canvas', (req, res) => {

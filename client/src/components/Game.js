@@ -76,14 +76,21 @@ export default function Game({ socket }) {
             setLeader(data.leaderId);
             setUsers(prevUsers => {
                 const newUsers = prevUsers.filter(user => user.id !== data.user.id);
-                
+                console.log(newUsers);
+                console.log(currentDrawer);
                 if (gameStarted && !newUsers.some(user => user.id === currentDrawer.id)) {
                     // Check that newUsers is non-empty before setting a new drawer
                     const newDrawer = newUsers[newUsers.findIndex(user => user.id === data.user.id) + 1];
+ 
+                    if (newDrawer.id === newUsers[0].id) {
+                        socket.emit("update_round", { roomId: roomId.current });
+                    }
+
                     setCurrentDrawer(newDrawer);
-                    
-                    // Check if the new drawer is the current socket user
+                    socket.emit("new_drawer", { roomId: roomId.current, newDrawer });
+
                     getWordChoices();
+                    // Check if the new drawer is the current socket user
                     setShowModal(newDrawer && newDrawer.id === socket.id);
                 }
     
@@ -134,7 +141,7 @@ export default function Game({ socket }) {
                 socket.emit("leave_room", { roomId: roomId.current });
             });
         }
-    }, [gameStarted, users])
+    }, [gameStarted, users, currentDrawer])
 
     if (!state.current) {
         socket.emit("leave_room", { roomId: roomId.current });
