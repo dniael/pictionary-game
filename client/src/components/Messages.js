@@ -11,13 +11,13 @@ export default function Messages({ socket, roomId, username, messages, onMsg }) 
         const msgListener = data => onMsg(data);
         socket.on("receive_message", msgListener);
         return () => socket.off("receive_message", msgListener);
-    }, []);
+    }, [onMsg, socket]);
 
     useLayoutEffect(() => {
         if (messagesAreaRef.current) {
             messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
         }
-    }, [messages]);
+    }, [messages, messagesAreaRef]);
     
     const sendMessage = async (e) => {
         if (e.key !== 'Enter') return; 
@@ -25,12 +25,16 @@ export default function Messages({ socket, roomId, username, messages, onMsg }) 
         const msg = msgInputRef.current.value
         if (msg === "") return;
 
+
         const msgData = {
-            roomId, author: username, message: msg, time: new Date(Date.now()).toLocaleTimeString(), type: "user"
+            roomId, 
+            author: username,
+            message: msg, 
+            time: new Date(Date.now()).toLocaleTimeString(), 
+            type: "user",
         };
 
         await socket.emit("send_message", msgData);
-        onMsg(msgData);
         msgInputRef.current.value = "";
     }
 
@@ -41,9 +45,14 @@ export default function Messages({ socket, roomId, username, messages, onMsg }) 
             </Card.Header>
             <Card.Body style={{ maxHeight: '650px', overflowY: 'scroll' }} ref={messagesAreaRef}>
                 {messages.map((msg, index) => (
-                    <div style={{ backgroundColor: (index % 2 === 0 ? 'lightgray' : 'white'), padding: '5px' }} key={index}>
+                    <div style={{ 
+                        backgroundColor: (index % 2 === 0 ? 'lightgray' : 'white'), padding: '5px',
+                        color: msg.color
+                    }} key={index}>
                         {msg.type === "user" ? (
-                            <div><strong>{msg.author}:</strong> {msg.message}</div>
+                            <div>
+                                <strong>{msg.author}:</strong> {msg.message}
+                            </div>
                         ) : (
                             <div style={{ textAlign: 'center' }}><strong>{msg.message}</strong></div>
                         )

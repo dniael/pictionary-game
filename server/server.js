@@ -52,20 +52,24 @@ io.on('connection', socket => {
 
             // lowkey a hack to prevent a double timer spawn when a user leaves
             timerId: null,
+
+            drawStartTime: null
         });
     });
     
     socket.on("join_room", data => {
         const room = getRoom(data.roomId);
         if (!room) return;
-        const userData = { username: data.username, id: socket.id, points: 0 };
+        const userData = { username: data.username, id: socket.id, points: 0, roundGuessedCorrect: false };
         
         room.users.push(userData)
-        room.messages.push({ type: "System", message: `${data.username} joined.` });
+        
+        const msgData = { type: "System", message: `${data.username} joined.`, color: 'orange' };
+        room.messages.push(msgData);
 
         socket.join(data.roomId);
         console.log(`User with ID: ${socket.id} joined room: ${data.roomId}`);
-        socket.to(data.roomId).emit("user_connect", userData);
+        socket.to(data.roomId).emit("user_connect", { user: userData, msg: msgData });
         console.log(room);
     });
 
@@ -102,15 +106,47 @@ io.on('connection', socket => {
     socket.on("start_draw", data => {
         const room = getRoom(data.roomId);
         room.currentWord = data.word;
+        
         io.to(data.roomId).emit("receive_start_draw", { word: data.word, drawtime: room.drawtime });
+        room.drawStartTime = Date.now();
         startDrawtimeCountdown(room);
     });
     
     socket.on("send_message", data => {
         const room = getRoom(data.roomId)
         room.messages.push(data)
-        socket.to(room.id).emit("receive_message", data);
+
+        const user = room.users.find(u => u.id === socket.id);
+        let msgData;
+
+
+        const userCorrect = user => user.roundGuessedCorrect || user.id === room.currentDrawer.id
         
+        if (userCorrect(user)) {
+            room.users.forEach(u => {
+                if (userCorrect(u)) {
+                    io.to(u.id).emit("receive_message", { ...data, color: 'green'})
+                }
+            });
+        } else if (data.message === room.currentWord) {
+            
+            const timeTaken = (Date.now() - room.drawStartTime) / 500; // Time taken in seconds
+            const maxPoints = 100; // Maximum points for guessing quickly
+            const minPoints = 10; // Minimum points for guessing slowly
+            const points = Math.max(minPoints, maxPoints - Math.floor(timeTaken)); // Calculate points based on time taken
+    
+            user.points += points;
+            user.roundGuessedCorrect = true;
+            
+            msgData = { type: "System", message: `${data.author} guessed the word correctly!`, color: 'green' };
+            room.messages.push(msgData);
+            io.to(room.id).emit("receive_message", msgData);
+        } else {
+            msgData = { ...data, color: 'black' };
+            room.messages.push(msgData);
+            io.to(room.id).emit("receive_message", msgData);
+        }
+
     });
 
     socket.on("send_draw_start", data => {
@@ -190,7 +226,8 @@ function startDrawtimeCountdown(room) {
 
 function userLeave(socket, user, room) {
 
-    room.messages.push({ type: "System", message: `${user.username} left.` });
+    const msgData ={ type: "System", message: `${user.username} left.`, color: 'orange' };
+    room.messages.push(msgData);
     
     // when a user leaves during drawing, stop the timer
     clearInterval(room.timerId);
@@ -209,7 +246,7 @@ function userLeave(socket, user, room) {
         }
     }
 
-    socket.to(room.id).emit("user_disconnect", { user, leaderId: newLeader ? room.leaderId : null });
+    socket.to(room.id).emit("user_disconnect", { user, leaderId: newLeader ? room.leaderId : null, msg: msgData });
 
     console.log(room);
 }

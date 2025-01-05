@@ -21,9 +21,13 @@ export default function Game({ socket }) {
     const [users, setUsers] = React.useState([]);
     const [canvasHistory, setCanvasHistory] = React.useState([]);
     const [canvasUndoHistory, setCanvasUndoHistory] = React.useState([]);
+
     const [wordChoices, setWordChoices] = React.useState([]);
     const [leader, setLeader] = React.useState();
+
     const [gameStarted, setGameStarted] = React.useState(false);
+    const [isRoundTransition, setIsRoundTransition] = React.useState(false);
+
     const [currentDrawer, setCurrentDrawer] = React.useState();
     const [currentWord, setCurrentWord] = React.useState();
     const [currentRound, setCurrentRound] = React.useState(0);
@@ -63,16 +67,16 @@ export default function Game({ socket }) {
         }
         verify();
 
-    }, [])
+    }, []);
 
     useEffect(() => {
         const connectListener = data => {
-            setMessages(msgs => [...msgs, { type: "System", message: `${data.username} joined.` }]);
-            setUsers(users => [...users, data]);
-        }
+            setMessages(msgs => [...msgs, data.msg]);
+            setUsers(users => [...users, data.user]);
+        };
 
         const disconnectListener = data => {
-            setMessages(msgs => [...msgs, { type: "system", message: `${data.user.username} left.` }]);
+            setMessages(msgs => [...msgs, data.msg]);
             setLeader(data.leaderId);
             setUsers(prevUsers => {
                 const newUsers = prevUsers.filter(user => user.id !== data.user.id);
@@ -97,29 +101,33 @@ export default function Game({ socket }) {
                 return newUsers;
             });
 
-        }
+        };
 
         const gameStartedListener = data => {
             setGameStarted(true);
             setCurrentDrawer(data.currentDrawer);
             console.log("receive start game");
-        }
+        };
 
         const newDrawerListener = data => {
             setCurrentDrawer(data.newDrawer);
-            if (data.newDrawer.id == socket.id) {
+            if (data.newDrawer.id === socket.id) {
                 promptWord();
             }
-        }
+        };
 
         const updateRoundListener = data => {
             setCurrentRound(data.currentRound);
-        }
+        };
 
         const startDrawListener = data => {
             setCurrentWord(data.word);
             setShowModal(false);
-        }
+        };
+
+        const roundTransitionListener = data => {
+
+        };
 
         socket.on("user_connect", connectListener);
         socket.on("user_disconnect", disconnectListener);
@@ -140,7 +148,7 @@ export default function Game({ socket }) {
                 console.log("user leave room via back button press");
                 socket.emit("leave_room", { roomId: roomId.current });
             });
-        }
+        };
     }, [gameStarted, users, currentDrawer])
 
     if (!state.current) {
@@ -169,7 +177,7 @@ export default function Game({ socket }) {
         promptWord();
     }
 
-    const startDraw = (word, currentDrawer, users) => {
+    const startDraw = (word) => {
 
         setCurrentWord(word);
         socket.emit("clear_board", { roomId: roomId.current });
@@ -190,7 +198,7 @@ export default function Game({ socket }) {
     }
 
     // KEEP FIGURING OUT ROUNDS SYSTEM
-    const handleNewDrawer = (round, currentDrawer, users, leader) => {
+    const handleNewDrawer = (round, currentDrawer, users) => {
 
         if (users.length === 1) {
             alert("need more players");
@@ -235,7 +243,7 @@ export default function Game({ socket }) {
         <Timer 
             visible={gameStarted} 
             socket={socket} 
-            onEnd={() => handleNewDrawer(currentRound, currentDrawer, users, leader)}
+            onEnd={() => handleNewDrawer(currentRound, currentDrawer, users)}
             word={currentWord}
             currentDrawer={currentDrawer}    
         />
@@ -306,7 +314,7 @@ export default function Game({ socket }) {
             <Modal.Body>
                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly' }}>
                     {wordChoices.map(word => (
-                        <Button variant='primary' onClick={() => startDraw(word, currentDrawer, users)}>
+                        <Button variant='primary' onClick={() => startDraw(word)}>
                             {word}
                         </Button>
                     ))}
